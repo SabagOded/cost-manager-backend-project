@@ -1,12 +1,13 @@
+require('dotenv').config(); // Loads environment variables from .env into process.env before the rest of the application is initialized
 const express = require('express'); // Loads the express package and returns what it exports
 const connectToDatabase = require('./models/database'); // Imports the function responsible for connecting to MongoDB
 const User = require('./models/user'); // Imports the Mongoose User model for working with user documents in MongoDB
 const errors = require('./errors'); // Imports the Users Service errors definitions
 
 const app = express(); // Creating the Express Application
-app.use(express.json()); // Parses incoming JSON request bodies and makes the data available through req.body
-
 const port = process.env.PORT || 3000; // localhost:3000 → Users Service
+
+app.use(express.json()); // Parses incoming JSON request bodies and makes the data available through req.body
 
 connectToDatabase()
     .then(function(){ // Connection successful
@@ -24,12 +25,79 @@ app.get('/', function (req, res) {
     res.send('Users service is running');
 });
 
+app.get('/api/users', function (req, res) {
+    // Returns all users stored in the database
+    User.find() // Retrieves all user documents from the users collections
+        .then(function(users) {
+            return res.status(200).json(users);
+        })
+        .catch(function(error){
+            return res.status(500).json(errors.INTERNAL_SERVER_ERROR);
+        });
+});
+
+app.get('/api/users/:id', function (req, res) {
+    //Returns a specific user together with the total amount of their costs
+    const requestedUserId = Number(req.params.id);
+    if (Number.isNaN(requestedUserId)) { // Validates that the user ID in the URL is a valid number
+        return res.status(400).json(errors.INVALID_USER_INPUT);
+    }
+        User.findOne({ id: requestedUserId }) // Finds the user by the application-specific ID
+            .then(function(user) {
+                if (!user) {
+                    return res.status(404).json(errors.USER_NOT_FOUND);
+                    //HTTP 404 The server returns an error when no user matches the requested ID
+                }
+                return fetch(`http://localhost:3001/api/total/${requestedUserId}`) // Sends an HTTP GET request from the Users Service to the Costs Service
+                    .then(function(response) {
+                        // fetch does not reject automatically for HTTP error status codes
+                        if (!response.ok) {
+                            throw errors.INTERNAL_SERVER_ERROR;
+                        }
+                        return response.json(); // Parses the response body from JSON into a JavaScript object
+                    })
+                    .then(function (costData) {
+                        // CostData now contains the parsed data returned by the Costs Service
+                        return res.status(200).json({
+                            first_name: user.first_name,
+                            last_name: user.last_name,
+                            id: user.id,
+                            total: costData.total
+                        });
+                    });
+            }).catch(function(error){
+                return res.status(500).json(errors.INTERNAL_SERVER_ERROR);
+            });
+});
+
+app.get('/api/users/:id/exists', function (req, res) {
+    // Check whether a user exists without triggering the Costs Service dependency
+    const requestedUserId = Number(req.params.id);
+    if (Number.isNaN(requestedUserId)) {
+        return res.status(400).json(errors.INVALID_USER_INPUT);
+    }
+    User.findOne( {id: requestedUserId} ) // Finds the user by the application-specific ID
+        .then(function(user) { // Returns only the existence result needed by other services
+            if(!user){
+                return res.status(200).json({
+                        exists: false
+                });
+            }
+            return res.status(200).json({
+                exists: true
+            });
+        })
+        .catch(function(error) {
+            return res.status(500).json(errors.INTERNAL_SERVER_ERROR);
+        });
+});
+
 app.post('/api/add', function (req, res) {
     // Handles requests for creating a new user
     const userData = req.body; //Gets the parsed user data sent in the request body
 
     if ( // Validates that all required user fields were provided
-    userData.id === undefined ||
+        userData.id === undefined ||
         userData.first_name === undefined ||
         userData.last_name === undefined ||
         userData.birthday === undefined
@@ -62,56 +130,15 @@ app.post('/api/add', function (req, res) {
                 birthday: userData.birthday
             });
         })
-        .then(function(createdUser){
+        .then(function(createdUser) {
             return res.status(201).json(createdUser);
         })
         .catch(function(error) {
-            if (error.id === errors.USER_ALREADY_EXISTS.id){ // Handles the duplicate user error separately from unexcepted server errors
+            if (error.id === errors.USER_ALREADY_EXISTS.id){ // Handles the duplicate user error separately from unexpected server errors
                 return res.status(409).json(errors.USER_ALREADY_EXISTS);
                 //HTTP 409 Conflict (The request could not be processed because of a conflict with the current state)
             }
             return res.status(500).json(errors.INTERNAL_SERVER_ERROR);
-            //HTTP 500 Internal Server Error (The server encountered an unexcepted condition that prevented it from fulling the request)
+            //HTTP 500 Internal Server Error (The server encountered an unexpected condition that prevented it from fulfilling the request)
         });
-});
-
-app.get('/api/users', function (req, res) {
-    // Returns all users stored in the database
-    User.find() // Retrieves all user documents from the users collections
-        .then(function(users) {
-            return res.status(200).json(users);
-        })
-        .catch(function(error){
-            return res.status(500).json(errors.INTERNAL_SERVER_ERROR);
-        });
-});
-
-app.get('/api/users/:id', function (req, res) {
-    //Returns a specific user together with the total amount of their costs
-    const requestedUserId = Number(req.params.id);
-    if (Number.isNaN(requestedUserId)) { // Validates that the user ID in the URL is a valid number
-        return res.status(400).json(errors.INVALID_USER_INPUT);
-    }
-        User.findOne({ id: requestedUserId }) // Finds the user by the application-specific ID
-            .then(function(user) {
-                if (!user) {
-                    return res.status(404).json(errors.USER_NOT_FOUND);
-                    //HTTP 404 The server returns an error when no user matches the requested ID
-                }
-                return fetch(`http://localhost:3001/api/total/${requestedUserId}`) // Sends an HTTP GET request from the Users Service to the Costs Service
-                    .then(function(response) {
-                        return response.json(); // Parses the response body from JSON into a JavaScript object
-                    })
-                    .then(function (costData) {
-                        // CostData now contains the parsed data returned by the Costs Service
-                        return res.status(200).json({
-                            first_name: user.first_name,
-                            last_name: user.last_name,
-                            id: user.id,
-                            total: costData.total
-                        });
-                    });
-            }).catch(function(error){
-                return res.status(500).json(errors.INTERNAL_SERVER_ERROR);
-            });
 });

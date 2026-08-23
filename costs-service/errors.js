@@ -7,6 +7,10 @@ const errors = {
     INTERNAL_SERVER_ERROR: {
         id: 202,
         message: 'Internal server error'
+    },
+    INVALID_COST_INPUT: {
+        id: 203,
+        message: 'Invalid cost input'
     }
 };
 
