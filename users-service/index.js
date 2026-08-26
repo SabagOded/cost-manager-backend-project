@@ -3,11 +3,41 @@ const express = require('express'); // Loads the express package and returns wha
 const connectToDatabase = require('./models/database'); // Imports the function responsible for connecting to MongoDB
 const User = require('./models/user'); // Imports the Mongoose User model for working with user documents in MongoDB
 const errors = require('./errors'); // Imports the Users Service errors definitions
+const sendLog = require('./logClient');
 
 const app = express(); // Creating the Express Application
 const port = process.env.PORT || 3000; // localhost:3000 → Users Service
 
 app.use(express.json()); // Parses incoming JSON request bodies and makes the data available through req.body
+
+app.use(function (req, res, next) {
+   sendLog({
+       service: 'users-service',
+       level: 'info',
+       message: 'Request received',
+       method: req.method,
+       path: req.originalUrl,
+   })
+       .catch(function(error) {
+           console.error('Failed to send request log: ', error.message);
+       });
+
+   next();
+});
+
+function logEndpointAccess(req, res, next) {
+    sendLog({
+        service: 'users-service',
+        level: 'info',
+        message: 'Endpoint accessed',
+        method: req.method,
+        path: req.originalUrl
+    })
+        .catch(function(error) {
+            console.error('Failed to send endpoint log: ', error.message);
+        });
+    next();
+}
 
 connectToDatabase()
     .then(function(){ // Connection successful
@@ -21,11 +51,11 @@ connectToDatabase()
         console.error('Failed to connect to MongoDB:', error.message);
     });
 
-app.get('/', function (req, res) {
+app.get('/', logEndpointAccess, function (req, res) {
     res.send('Users service is running');
 });
 
-app.get('/api/users', function (req, res) {
+app.get('/api/users', logEndpointAccess, function (req, res) {
     // Returns all users stored in the database
     User.find() // Retrieves all user documents from the users collections
         .then(function(users) {
@@ -36,7 +66,7 @@ app.get('/api/users', function (req, res) {
         });
 });
 
-app.get('/api/users/:id', function (req, res) {
+app.get('/api/users/:id', logEndpointAccess, function (req, res) {
     //Returns a specific user together with the total amount of their costs
     const requestedUserId = Number(req.params.id);
     if (Number.isNaN(requestedUserId)) { // Validates that the user ID in the URL is a valid number
@@ -70,7 +100,7 @@ app.get('/api/users/:id', function (req, res) {
             });
 });
 
-app.get('/api/users/:id/exists', function (req, res) {
+app.get('/api/users/:id/exists', logEndpointAccess, function (req, res) {
     // Check whether a user exists without triggering the Costs Service dependency
     const requestedUserId = Number(req.params.id);
     if (Number.isNaN(requestedUserId)) {
@@ -92,7 +122,7 @@ app.get('/api/users/:id/exists', function (req, res) {
         });
 });
 
-app.post('/api/add', function (req, res) {
+app.post('/api/add', logEndpointAccess, function (req, res) {
     // Handles requests for creating a new user
     const userData = req.body; //Gets the parsed user data sent in the request body
 

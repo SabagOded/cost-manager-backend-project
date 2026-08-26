@@ -4,11 +4,42 @@ const connectToDatabase = require('./models/database'); // Imports the function 
 const Cost = require('./models/cost'); //Imports the Mongoose Cost model for working with cost documents
 const errors = require('./errors'); // Imports the Costs Service errors definitions
 const MonthlyReport = require('./models/monthlyReport');
+const sendLog = require('./logClient');
 
 const app = express(); // Creating the Express Application
 const port = process.env.PORT || 3001; // localhost:3001 → Costs Service
 
 app.use(express.json()); // Parses incoming JSON request bodies and makes the data available through req.body
+
+app.use(function (req, res, next) {
+    sendLog({
+        service: 'costs-service',
+        level: 'info',
+        message: 'Request received',
+        method: req.method,
+        path: req.originalUrl,
+    })
+        .catch(function (error) {
+            console.error('Failed to send request log: ', error.message);
+        });
+
+    next();
+});
+
+function logEndpointAccess(req, res, next) {
+    sendLog({
+        service: 'costs-service',
+        level: 'info',
+        message: 'Endpoint accessed',
+        method: req.method,
+        path: req.originalUrl
+    })
+        .catch(function(error) {
+            console.error('Failed to send endpoint log: ', error.message);
+        });
+
+    next();
+}
 
 connectToDatabase()
     .then(function(){ // Connection successful
@@ -22,11 +53,11 @@ connectToDatabase()
         console.error('Failed to connect to MongoDB:', error.message);
     });
 
-app.get('/', function (req, res)  {
+app.get('/', logEndpointAccess, function (req, res) {
     res.send('Costs Service is running');
 });
 
-app.get('/api/total/:userid', function (req, res)  {
+app.get('/api/total/:userid', logEndpointAccess, function (req, res)  {
     //Returns the total amount of costs for a specific user
     const requestedUserid = Number(req.params.userid);
 
@@ -50,7 +81,7 @@ app.get('/api/total/:userid', function (req, res)  {
         });
 });
 
-app.post('/api/add', function (req, res)  {
+app.post('/api/add', logEndpointAccess, function (req, res)  {
     //Handles HTTP POST requests for creating a new cost
     const costData = req.body;
 
@@ -129,7 +160,7 @@ app.post('/api/add', function (req, res)  {
         });
 });
 
-app.get('/api/report', function (req, res)  { // Extracts and convert the user id from the query string
+app.get('/api/report', logEndpointAccess, function (req, res)  { // Extracts and convert the user id from the query string
     const requestedUserId = Number(req.query.id);
 
     if (Number.isNaN(requestedUserId)) {
