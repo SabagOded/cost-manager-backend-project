@@ -3,6 +3,7 @@ const express = require('express'); // Loads the express package and returns wha
 const connectToDatabase = require('./models/database'); // Imports the function responsible for connecting to MongoDB
 const Cost = require('./models/cost'); //Imports the Mongoose Cost model for working with cost documents
 const errors = require('./errors'); // Imports the Costs Service errors definitions
+const MonthlyReport = require('./models/monthlyReport');
 
 const app = express(); // Creating the Express Application
 const port = process.env.PORT || 3001; // localhost:3001 → Costs Service
@@ -125,5 +126,124 @@ app.post('/api/add', function (req, res)  {
                 return res.status(400).json(errors.INVALID_COST_INPUT);
             }
             return res.status(500).json(errors.INTERNAL_SERVER_ERROR); // For any  unexpected database, network or application error
+        });
+});
+
+app.get('/api/report', function (req, res)  { // Extracts and convert the user id from the query string
+    const requestedUserId = Number(req.query.id);
+
+    if (Number.isNaN(requestedUserId)) {
+        return res.status(400).json(errors.INVALID_USER_ID);
+    }
+
+    const requestedYear = Number(req.query.year);
+
+    // The report must receive a valid positive integer year
+    if (Number.isNaN(requestedYear) ||
+        requestedYear <= 0 ||
+        (!Number.isInteger(requestedYear))) {
+            return res.status(400).json(errors.INVALID_REPORT_INPUT);
+    }
+
+    const requestedMonth = Number(req.query.month);
+
+    // Month must be an integer between 1 and 12
+    if (Number.isNaN(requestedMonth) ||
+        (requestedMonth <= 0 || requestedMonth >= 13) ||
+        (!Number.isInteger(requestedMonth))) {
+        return res.status(400).json(errors.INVALID_REPORT_INPUT);
+    }
+
+    //Create the exact UTC boundaries of the requested month.
+    const startDate = new Date( // startDate is inclusive
+        Date.UTC(requestedYear, requestedMonth - 1, 1, 0, 0, 0, 0));
+
+    const endDate = new Date( // endDate represents the first day of the following month and is therefore exclusive.
+        Date.UTC(requestedYear, requestedMonth, 1, 0, 0, 0));
+
+    function calculateReport() {
+        // Calculate a monthly report directly from the costs collection
+        // The function returns a Promise that resolves to the report object and doesn't send an HTTP response by itself
+
+        const reportCosts = { food: [], health: [], housing: [], sports: [], education:[] }; // Initialize every required category so that empty
+                                                                                            // categories are still included in the final report
+
+        return Cost.find( { // Fetch only costs that belong to the requested user and month
+            userid: requestedUserId,
+            date: {
+                "$gte": startDate,
+                "$lt": endDate
+            }
+        })
+            .then(function(costs) {
+                for (const cost of costs) { // Group each cost under its category and keep only the fields required by the monthly report API
+                    reportCosts[cost.category].push({
+                        sum: cost.sum,
+                        description: cost.description,
+                        day: cost.date.getUTCDate()
+                    });
+                }
+                return {
+                    userid: requestedUserId,
+                    year: requestedYear,
+                    month: requestedMonth,
+                    costs: reportCosts
+                };
+            });
+    }
+
+    /*
+    The Computed Pattern is used for historical monthly reports.
+    Once a month has ended, its costs cannot change because pasts costs cannot be added.
+    Therefore, the report is calculated once and stored.
+    Future requests for the same historical month return the saved report insted of quering and calculating the costs again.
+     */
+
+    const isHistoricalMonth = endDate.getTime() <= Date.now();
+
+    if (isHistoricalMonth) { // Historical reports may already have a previously computed result
+        return MonthlyReport.findOne({ // Check whether this exact user/month/year report was alreay computed
+            userid: requestedUserId,
+            month: requestedMonth,
+            year: requestedYear
+        })
+            .then(function (savedReport) {
+                if (savedReport) { // Reuse the stored report instead of calculating the month again
+                    return res.status(200).json({
+                        userid: savedReport.userid,
+                        month: savedReport.month,
+                        year: savedReport.year,
+                        costs: savedReport.costs
+                    });
+                }
+                return calculateReport() // No stored report exist yet, so calculate it once and persist it
+                    .then(function(report) {
+                        return MonthlyReport.create(report);
+                    })
+                    .then(function(savedReport) {
+                        return res.status(200).json({
+                            userid: savedReport.userid,
+                            month: savedReport.month,
+                            year: savedReport.year,
+                            costs: savedReport.costs
+                        });
+                    });
+            })
+            .catch(function(error) {
+                return res.status(500).json(errors.INTERNAL_SERVER_ERROR);
+            })
+    }
+
+    return calculateReport() // Current and future months are calculated dynamically and are not stored, because their data may still change
+        .then(function(report) {
+            return res.status(200).json({
+                userid: report.userid,
+                month: report.month,
+                year: report.year,
+                costs: report.costs
+            });
+        })
+        .catch(function(error) {
+            return res.status(500).json(errors.INTERNAL_SERVER_ERROR);
         });
 });

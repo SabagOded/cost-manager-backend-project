@@ -11,6 +11,10 @@ const errors = {
     INVALID_COST_INPUT: {
         id: 203,
         message: 'Invalid cost input'
+    },
+    INVALID_REPORT_INPUT: {
+        id: 204,
+        message: 'Invalid report input'
     }
 };
 
