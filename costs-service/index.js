@@ -11,6 +11,9 @@ const port = process.env.PORT || 3001; // localhost:3001 → Costs Service
 
 app.use(express.json()); // Parses incoming JSON request bodies and makes the data available through req.body
 
+// Global logging middleware - runs for every HTTP request received by the Costs Service.
+// sendLog() starts an HTTP request to the Logs Service, but we do not wait for it.
+// Logging should not delay or block the main business request.
 app.use(function (req, res, next) {
     sendLog({
         service: 'costs-service',
@@ -23,9 +26,11 @@ app.use(function (req, res, next) {
             console.error('Failed to send request log: ', error.message);
         });
 
-    next();
+    next(); // Continue the Express request flow immediately
 });
 
+// Route-level logging middleware - records that a specific endpoint was matched.
+// It is passed to each route before the actual endpoint handler.
 function logEndpointAccess(req, res, next) {
     sendLog({
         service: 'costs-service',
@@ -38,7 +43,7 @@ function logEndpointAccess(req, res, next) {
             console.error('Failed to send endpoint log: ', error.message);
         });
 
-    next();
+    next(); // Continue to the actual endpoint handler
 }
 
 connectToDatabase()
@@ -192,11 +197,21 @@ app.get('/api/report', logEndpointAccess, function (req, res)  { // Extracts and
     const endDate = new Date( // endDate represents the first day of the following month and is therefore exclusive.
         Date.UTC(requestedYear, requestedMonth, 1, 0, 0, 0));
 
+    function formatReportCosts(reportCosts) {
+        return [
+            { food: reportCosts.food },
+            { education: reportCosts.education },
+            { health: reportCosts.health },
+            { housing: reportCosts.housing },
+            { sport: reportCosts.sport }
+        ];
+    }
+
     function calculateReport() {
         // Calculate a monthly report directly from the costs collection
         // The function returns a Promise that resolves to the report object and doesn't send an HTTP response by itself
 
-        const reportCosts = { food: [], health: [], housing: [], sports: [], education:[] }; // Initialize every required category so that empty
+        const reportCosts = { food: [], education: [], health: [], housing: [], sport: [] }; // Initialize every required category so that empty
                                                                                             // categories are still included in the final report
 
         return Cost.find( { // Fetch only costs that belong to the requested user and month
@@ -244,7 +259,7 @@ app.get('/api/report', logEndpointAccess, function (req, res)  { // Extracts and
                         userid: savedReport.userid,
                         month: savedReport.month,
                         year: savedReport.year,
-                        costs: savedReport.costs
+                        costs: formatReportCosts(savedReport.costs)
                     });
                 }
                 return calculateReport() // No stored report exist yet, so calculate it once and persist it
@@ -256,13 +271,14 @@ app.get('/api/report', logEndpointAccess, function (req, res)  { // Extracts and
                             userid: savedReport.userid,
                             month: savedReport.month,
                             year: savedReport.year,
-                            costs: savedReport.costs
+                            costs: formatReportCosts(savedReport.costs)
                         });
                     });
             })
             .catch(function(error) {
+                console.error('Report error:', error);
                 return res.status(500).json(errors.INTERNAL_SERVER_ERROR);
-            })
+            });
     }
 
     return calculateReport() // Current and future months are calculated dynamically and are not stored, because their data may still change
@@ -271,10 +287,11 @@ app.get('/api/report', logEndpointAccess, function (req, res)  { // Extracts and
                 userid: report.userid,
                 month: report.month,
                 year: report.year,
-                costs: report.costs
+                costs: formatReportCosts(report.costs)
             });
         })
         .catch(function(error) {
+            console.error('Report error:', error);
             return res.status(500).json(errors.INTERNAL_SERVER_ERROR);
         });
 });

@@ -14,7 +14,7 @@ const monthlyReportSchema = new mongoose.Schema({
         food: [reportItemSchema],
         health: [reportItemSchema],
         housing: [reportItemSchema],
-        sports: [reportItemSchema],
+        sport: [reportItemSchema],
         education: [reportItemSchema]
     }
 });

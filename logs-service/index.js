@@ -10,6 +10,8 @@ const port = process.env.PORT || 3002; // localhost:3002 → Logs Service
 
 app.use(express.json());
 
+// Global middleware - runs for every HTTP request that reaches the Logs Service
+// Logging is intentionally non-blocking: we start saving the log, but immediately call next() so the actual request doesn't wait for MongoDB
 app.use(function (req, res, next) {
     writeLog({
         service: 'logs-service',
@@ -22,9 +24,11 @@ app.use(function (req, res, next) {
             console.error('Failed to save request log:', error.message);
         });
 
-    next();
+    next(); // Pass control to the next middleware or route handler in Express
 });
 
+// Route-level middleware - runs only when a specific endpoint is matched.
+// It creates a separate log event indicating that the endpoint itself was reached.
 function logEndpointAccess(req, res, next) {
     writeLog({
         service: 'logs-service',
@@ -34,10 +38,10 @@ function logEndpointAccess(req, res, next) {
         path: req.originalUrl,
     })
         .catch(function (error) {
-            console.error('Failed to save request log:', error.message);
+            console.error('Failed to save endpoint log:', error.message);
         });
 
-    next();
+    next(); // Continue to the actual handler after starting the log operation
 }
 
 app.get('/', logEndpointAccess, function (req, res) {
@@ -67,7 +71,11 @@ app.get('/api/logs', logEndpointAccess, function (req, res) {
         });
 });
 
+// Internal ingestion endpoint used by the other microservices.
+// They send log events here over HTTP, and the Logs Service persists them using writeLog().
 app.post('/api/logs', logEndpointAccess, function (req, res) {
+    // Required fields: service, level, message,
+    // HTTP metadata such as method, path and status is optional.
     const logData = req.body || {};
 
     if (!logData.service || typeof logData.service !== 'string') {

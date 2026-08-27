@@ -4,6 +4,9 @@ const sendLog = require('./logClient');
 const app = express(); //Creating the Express Application
 const port = process.env.PORT || 3003; //localhost:3003 → Team Service
 
+// Global logging middleware - runs for every HTTP request received by the Team Service.
+// sendLog() starts an HTTP request to the Logs Service, but we do not wait for it.
+// Logging should not delay or block the main business request.
 app.use(function (req, res, next) {
     sendLog({
         service: 'team-service',
@@ -16,9 +19,11 @@ app.use(function (req, res, next) {
             console.error('Failed to send request log: ', error.message);
         });
 
-    next();
+    next(); // Continue the Express request flow immediately
 });
 
+// Route-level logging middleware - records that a specific endpoint was matched.
+// It is passed to each route before the actual endpoint handler.
 function logEndpointAccess(req, res, next) {
     sendLog({
         service: 'team-service',
@@ -31,14 +36,14 @@ function logEndpointAccess(req, res, next) {
             console.error('Failed to send endpoint log: ', error.message);
         });
 
-    next();
+    next(); // Continue to the actual endpoint handler
 }
 
 app.get('/', logEndpointAccess, function (req, res) {
-    res.send('Team Service is running');
+    res.send('Team service is running');
 });
 
-app.get('/api/about', logEndpointAccess, function (req, res) {
+app.get('/api/about', logEndpointAccess, function (req, res) { // Returns static information about the development team.
     return res.status(200).json([
         {
             first_name: 'Oded',
@@ -49,6 +54,7 @@ app.get('/api/about', logEndpointAccess, function (req, res) {
             last_name: 'Naor',
         }
     ]);
+    // The team members are not stored in MongoDB because they are not application users.
 });
 
 app.listen(port, function(){

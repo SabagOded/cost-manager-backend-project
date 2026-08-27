@@ -10,6 +10,9 @@ const port = process.env.PORT || 3000; // localhost:3000 → Users Service
 
 app.use(express.json()); // Parses incoming JSON request bodies and makes the data available through req.body
 
+// Global logging middleware - runs for every HTTP request received by the Costs Service.
+// sendLog() starts an HTTP request to the Logs Service, but we do not wait for it.
+// Logging should not delay or block the main business request.
 app.use(function (req, res, next) {
    sendLog({
        service: 'users-service',
@@ -22,9 +25,11 @@ app.use(function (req, res, next) {
            console.error('Failed to send request log: ', error.message);
        });
 
-   next();
+   next(); // Continue the Express request flow immediately
 });
 
+// Route-level logging middleware - records that a specific endpoint was matched.
+// It is passed to each route before the actual endpoint handler.
 function logEndpointAccess(req, res, next) {
     sendLog({
         service: 'users-service',
@@ -36,7 +41,7 @@ function logEndpointAccess(req, res, next) {
         .catch(function(error) {
             console.error('Failed to send endpoint log: ', error.message);
         });
-    next();
+    next(); // Continue to the actual endpoint handler
 }
 
 connectToDatabase()
