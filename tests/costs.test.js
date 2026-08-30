@@ -1,6 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert');
 
+const usersServiceUrl = process.env.USERS_SERVICE_URL || 'http://localhost:3000';
+const costsServiceUrl = process.env.COSTS_SERVICE_URL || 'http://localhost:3001';
+
 test('GET /api/total/:userid returns zero for a user with no costs', async function() {
     const testUser = {
         id: Date.now(),
@@ -9,7 +12,7 @@ test('GET /api/total/:userid returns zero for a user with no costs', async funct
         birthday: '2000-01-01'
     };
 
-    const createResponse = await fetch("http://localhost:3000/api/add", {
+    const createResponse = await fetch(`${usersServiceUrl}/api/add`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -18,7 +21,7 @@ test('GET /api/total/:userid returns zero for a user with no costs', async funct
     });
     assert.strictEqual(createResponse.status, 201);
 
-    const totalResponse = await fetch(`http://localhost:3001/api/total/${testUser.id}`);
+    const totalResponse = await fetch(`${costsServiceUrl}/api/total/${testUser.id}`);
     assert.strictEqual(totalResponse.status, 200);
 
     const totalBody = await totalResponse.json();
@@ -38,7 +41,7 @@ test('POST /api/add creates a new cost', async function() {
         birthday: '2000-01-01'
     };
 
-    const createResponse = await fetch("http://localhost:3000/api/add", {
+    const createResponse = await fetch(`${usersServiceUrl}/api/add`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -54,7 +57,7 @@ test('POST /api/add creates a new cost', async function() {
         sum: 10
     };
 
-    const addCostResponse = await fetch("http://localhost:3001/api/add", {
+    const addCostResponse = await fetch(`${costsServiceUrl}/api/add`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -92,7 +95,7 @@ test('POST /api/add rejects invalid user id input', async function() {
         sum: 10
     };
 
-    const response = await fetch('http://localhost:3001/api/add', {
+    const response = await fetch(`${costsServiceUrl}/api/add`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -115,7 +118,7 @@ test('POST /api/add rejects a missing user', async function() {
         sum: 10
     };
 
-    const response = await fetch('http://localhost:3001/api/add', {
+    const response = await fetch(`${costsServiceUrl}/api/add`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -138,7 +141,7 @@ test('POST /api/add rejects invalid cost sum input', async function() {
         sum: '10'
     };
 
-    const response = await fetch('http://localhost:3001/api/add', {
+    const response = await fetch(`${costsServiceUrl}/api/add`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -161,7 +164,7 @@ test('POST /api/add rejects invalid cost category', async function() {
         birthday: '2000-01-01'
     };
 
-    const createUserResponse = await fetch('http://localhost:3000/api/add', {
+    const createUserResponse = await fetch(`${usersServiceUrl}/api/add`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -178,7 +181,7 @@ test('POST /api/add rejects invalid cost category', async function() {
         sum: 10
     };
 
-    const response = await fetch('http://localhost:3001/api/add', {
+    const response = await fetch(`${costsServiceUrl}/api/add`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -201,7 +204,7 @@ test('POST /api/add rejects invalid cost date', async function() {
         birthday: '2000-01-01'
     };
 
-    const createUserResponse = await fetch('http://localhost:3000/api/add', {
+    const createUserResponse = await fetch(`${usersServiceUrl}/api/add`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -219,7 +222,7 @@ test('POST /api/add rejects invalid cost date', async function() {
         date: 'not-a-date'
     };
 
-    const response = await fetch('http://localhost:3001/api/add', {
+    const response = await fetch(`${costsServiceUrl}/api/add`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -242,7 +245,7 @@ test('POST /api/add rejects a past cost date', async function() {
         birthday: '2000-01-01'
     };
 
-    const createUserResponse = await fetch('http://localhost:3000/api/add', {
+    const createUserResponse = await fetch(`${usersServiceUrl}/api/add`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -260,7 +263,7 @@ test('POST /api/add rejects a past cost date', async function() {
         date: '2020-01-01'
     };
 
-    const response = await fetch('http://localhost:3001/api/add', {
+    const response = await fetch(`${costsServiceUrl}/api/add`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -282,7 +285,7 @@ test('POST /api/add rejects missing cost description', async function() {
         sum: 10
     };
 
-    const response = await fetch('http://localhost:3001/api/add', {
+    const response = await fetch(`${costsServiceUrl}/api/add`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -305,7 +308,7 @@ test('GET /api/total/:userid returns the correct total for a user with costs', a
         birthday: '2000-01-01'
     };
 
-    const createResponse = await fetch("http://localhost:3000/api/add", {
+    const createResponse = await fetch(`${usersServiceUrl}/api/add`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -321,7 +324,7 @@ test('GET /api/total/:userid returns the correct total for a user with costs', a
         sum: 10
     };
 
-    const costResponse = await fetch(`http://localhost:3001/api/add`, {
+    const costResponse = await fetch(`${costsServiceUrl}/api/add`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -330,7 +333,7 @@ test('GET /api/total/:userid returns the correct total for a user with costs', a
     });
     assert.strictEqual(costResponse.status, 201);
 
-    const totalResponse = await fetch(`http://localhost:3001/api/total/${testUser.id}`);
+    const totalResponse = await fetch(`${costsServiceUrl}/api/total/${testUser.id}`);
     assert.strictEqual(totalResponse.status, 200);
 
     const totalBody = await totalResponse.json();
@@ -339,7 +342,7 @@ test('GET /api/total/:userid returns the correct total for a user with costs', a
 });
 
 test('GET /api/total/:userid rejects invalid user id', async function() {
-    const response = await fetch('http://localhost:3001/api/total/hello');
+    const response = await fetch(`${costsServiceUrl}/api/total/hello`);
 
     assert.strictEqual(response.status, 404);
 
@@ -349,7 +352,7 @@ test('GET /api/total/:userid rejects invalid user id', async function() {
 });
 
 test('GET / returns Costs Service health response', async function() {
-    const response = await fetch('http://localhost:3001/');
+    const response = await fetch(costsServiceUrl);
 
     assert.strictEqual(response.status, 200);
 
@@ -365,7 +368,7 @@ test('GET /api/report returns an empty monthly report for a user with no costs',
         birthday: '2000-01-01'
     };
 
-    const createUserResponse = await fetch('http://localhost:3000/api/add', {
+    const createUserResponse = await fetch(`${usersServiceUrl}/api/add`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -380,7 +383,7 @@ test('GET /api/report returns an empty monthly report for a user with no costs',
     const month = now.getUTCMonth() + 1;
 
     const response = await fetch(
-        `http://localhost:3001/api/report?id=${testUser.id}&year=${year}&month=${month}`
+        `${costsServiceUrl}/api/report?id=${testUser.id}&year=${year}&month=${month}`
     );
 
     assert.strictEqual(response.status, 200);
@@ -408,7 +411,7 @@ test('GET /api/report returns a monthly report with an existing cost', async fun
         birthday: '2000-01-01'
     };
 
-    const createUserResponse = await fetch('http://localhost:3000/api/add', {
+    const createUserResponse = await fetch(`${usersServiceUrl}/api/add`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -425,7 +428,7 @@ test('GET /api/report returns a monthly report with an existing cost', async fun
         sum: 25
     };
 
-    const createCostResponse = await fetch('http://localhost:3001/api/add', {
+    const createCostResponse = await fetch(`${costsServiceUrl}/api/add`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -443,7 +446,7 @@ test('GET /api/report returns a monthly report with an existing cost', async fun
     const day = createdDate.getUTCDate();
 
     const response = await fetch(
-        `http://localhost:3001/api/report?id=${testUser.id}&year=${year}&month=${month}`
+        `${costsServiceUrl}/api/report?id=${testUser.id}&year=${year}&month=${month}`
     );
 
     assert.strictEqual(response.status, 200);
@@ -473,7 +476,7 @@ test('GET /api/report returns a monthly report with an existing cost', async fun
 
 test('GET /api/report rejects invalid user id', async function() {
     const response = await fetch(
-        'http://localhost:3001/api/report?id=hello&year=2026&month=8'
+        `${costsServiceUrl}/api/report?id=hello&year=2026&month=8`
     );
 
     assert.strictEqual(response.status, 400);
@@ -485,7 +488,7 @@ test('GET /api/report rejects invalid user id', async function() {
 
 test('GET /api/report rejects invalid year', async function() {
     const response = await fetch(
-        'http://localhost:3001/api/report?id=123&year=0&month=8'
+        `${costsServiceUrl}/api/report?id=123&year=0&month=8`
     );
 
     assert.strictEqual(response.status, 400);
@@ -497,7 +500,7 @@ test('GET /api/report rejects invalid year', async function() {
 
 test('GET /api/report rejects invalid month', async function() {
     const response = await fetch(
-        'http://localhost:3001/api/report?id=123&year=2026&month=13'
+        `${costsServiceUrl}/api/report?id=123&year=2026&month=13`
     );
 
     assert.strictEqual(response.status, 400);
@@ -511,7 +514,7 @@ test('GET /api/report returns the same computed historical report on repeated re
     const testUserId = Date.now();
 
     const firstResponse = await fetch(
-        `http://localhost:3001/api/report?id=${testUserId}&year=2026&month=7`
+        `${costsServiceUrl}/api/report?id=${testUserId}&year=2026&month=7`
     );
 
     assert.strictEqual(firstResponse.status, 200);
@@ -519,7 +522,7 @@ test('GET /api/report returns the same computed historical report on repeated re
     const firstBody = await firstResponse.json();
 
     const secondResponse = await fetch(
-        `http://localhost:3001/api/report?id=${testUserId}&year=2026&month=7`
+        `${costsServiceUrl}/api/report?id=${testUserId}&year=2026&month=7`
     );
 
     assert.strictEqual(secondResponse.status, 200);
