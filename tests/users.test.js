@@ -1,8 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert');
 
+const usersServiceUrl = process.env.USERS_SERVICE_URL || 'http://localhost:3000';
+
 test('GET /api/users returns all users', async function() {
-    const response = await fetch('http://localhost:3000/api/users');
+    const response = await fetch(`${usersServiceUrl}/api/users`);
     assert.strictEqual(response.status, 200);
 
     const contentType = response.headers.get('content-type');
@@ -31,7 +33,7 @@ test('POST /api/add creates a new user', async function () {
         birthday: '2000-01-01',
     };
 
-    const response = await fetch('http://localhost:3000/api/add', {
+    const response = await fetch(`${usersServiceUrl}/api/add`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -68,7 +70,7 @@ test('POST /api/add rejects an existing user', async function() {
         birthday: '2000-01-01'
     };
 
-    const firstResponse = await fetch('http://localhost:3000/api/add', {
+    const firstResponse = await fetch(`${usersServiceUrl}/api/add`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -78,7 +80,7 @@ test('POST /api/add rejects an existing user', async function() {
 
     assert.strictEqual(firstResponse.status, 201);
 
-    const secondResponse = await fetch('http://localhost:3000/api/add', {
+    const secondResponse = await fetch(`${usersServiceUrl}/api/add`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -101,7 +103,7 @@ test('POST /api/add rejects invalid user id input', async function() {
         birthday: '2000-01-01'
     };
 
-    const response = await fetch('http://localhost:3000/api/add', {
+    const response = await fetch(`${usersServiceUrl}/api/add`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -124,7 +126,7 @@ test('POST /api/add rejects invalid user birthday input', async function() {
         birthday: 'not-a-date'
     };
 
-    const response = await fetch('http://localhost:3000/api/add', {
+    const response = await fetch(`${usersServiceUrl}/api/add`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -146,7 +148,7 @@ test('POST /api/add rejects missing user id input', async function() {
         birthday: '2000-01-01'
     };
 
-    const response = await fetch('http://localhost:3000/api/add', {
+    const response = await fetch(`${usersServiceUrl}/api/add`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -169,7 +171,7 @@ test('GET /api/users/:id returns an existing user with total costs', async funct
         birthday: '2000-01-01'
     };
 
-    const createResponse = await fetch('http://localhost:3000/api/add', {
+    const createResponse = await fetch(`${usersServiceUrl}/api/add`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -178,7 +180,7 @@ test('GET /api/users/:id returns an existing user with total costs', async funct
     });
     assert.strictEqual(createResponse.status, 201);
 
-    const userResponse = await fetch('http://localhost:3000/api/users/' + testUser.id);
+    const userResponse = await fetch(`${usersServiceUrl}/api/users/${testUser.id}`);
     assert.strictEqual(userResponse.status, 200);
 
     const body = await userResponse.json();
@@ -199,7 +201,7 @@ test('GET /api/users/:id returns an existing user with total costs', async funct
 });
 
 test('GET /api/users/hello rejects invalid user id', async function() {
-    const response = await fetch('http://localhost:3000/api/users/hello');
+    const response = await fetch(`${usersServiceUrl}/api/users/hello`);
 
     assert.strictEqual(response.status, 400);
 
@@ -210,7 +212,7 @@ test('GET /api/users/hello rejects invalid user id', async function() {
 
 test('GET /api/users/:id returns 404 for a missing user', async function() {
     const missingUserId = Date.now();
-    const response = await fetch('http://localhost:3000/api/users/' + missingUserId);
+    const response = await fetch(`${usersServiceUrl}/api/users/${missingUserId}`);
     assert.strictEqual(response.status, 404);
     const errorBody = await response.json();
     assert.strictEqual(errorBody.id, 103);
@@ -225,7 +227,7 @@ test('GET /api/users/:id/exists returns true for an existing user', async functi
         birthday: '2000-01-01'
     };
 
-    const createResponse = await fetch('http://localhost:3000/api/add/',{
+    const createResponse = await fetch(`${usersServiceUrl}/api/add/`,{
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -234,7 +236,7 @@ test('GET /api/users/:id/exists returns true for an existing user', async functi
     });
     assert.strictEqual(createResponse.status, 201);
 
-    const existsResponse = await fetch(`http://localhost:3000/api/users/${testUser.id}/exists`);
+    const existsResponse = await fetch(`${usersServiceUrl}/api/users/${testUser.id}/exists`);
     assert.strictEqual(existsResponse.status, 200);
 
     const existsBody = await existsResponse.json();
@@ -244,7 +246,7 @@ test('GET /api/users/:id/exists returns true for an existing user', async functi
 test('GET /api/users/:id/exists returns false for a missing user', async function() {
     const missingUserId = Date.now();
 
-    const existsResponse = await fetch(`http://localhost:3000/api/users/${missingUserId}/exists`);
+    const existsResponse = await fetch(`${usersServiceUrl}/api/users/${missingUserId}/exists`);
     assert.strictEqual(existsResponse.status, 200);
 
     const existsBody = await existsResponse.json();
@@ -252,7 +254,7 @@ test('GET /api/users/:id/exists returns false for a missing user', async functio
 });
 
 test('GET /api/users/:id/exists rejects invalid user id', async function() {
-    const response = await fetch('http://localhost:3000/api/users/hello/exists');
+    const response = await fetch(`${usersServiceUrl}/api/users/hello/exists`);
 
     assert.strictEqual(response.status, 400);
 
@@ -262,7 +264,7 @@ test('GET /api/users/:id/exists rejects invalid user id', async function() {
 });
 
 test('GET / returns Users Service health response', async function() {
-    const response = await fetch('http://localhost:3000/');
+    const response = await fetch(usersServiceUrl);
 
     assert.strictEqual(response.status, 200);
 
