@@ -1,8 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert');
 
+const logsServiceUrl = process.env.LOGS_SERVICE_URL || 'http://localhost:3002';
+
 test('GET / returns Logs Service health response', async function() {
-    const response = await fetch('http://localhost:3002/');
+    const response = await fetch(logsServiceUrl);
 
     assert.strictEqual(response.status, 200);
 
@@ -11,7 +13,7 @@ test('GET / returns Logs Service health response', async function() {
 });
 
 test('GET /api/logs returns an array of logs', async function() {
-    const response = await fetch('http://localhost:3002/api/logs');
+    const response = await fetch(`${logsServiceUrl}/api/logs`);
 
     assert.strictEqual(response.status, 200);
 
@@ -29,7 +31,7 @@ test('POST /api/logs creates a new log', async function() {
         status: 200
     };
 
-    const response = await fetch('http://localhost:3002/api/logs', {
+    const response = await fetch(`${logsServiceUrl}/api/logs`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -66,7 +68,7 @@ test('GET /api/logs contains a newly created log', async function() {
         message: uniqueMessage
     };
 
-    const createResponse = await fetch('http://localhost:3002/api/logs', {
+    const createResponse = await fetch(`${logsServiceUrl}/api/logs`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -76,7 +78,7 @@ test('GET /api/logs contains a newly created log', async function() {
 
     assert.strictEqual(createResponse.status, 201);
 
-    const logsResponse = await fetch('http://localhost:3002/api/logs');
+    const logsResponse = await fetch(`${logsServiceUrl}/api/logs`);
 
     assert.strictEqual(logsResponse.status, 200);
 
@@ -98,7 +100,7 @@ test('POST /api/logs rejects invalid log level', async function() {
         message: 'Invalid level test'
     };
 
-    const response = await fetch('http://localhost:3002/api/logs', {
+    const response = await fetch(`${logsServiceUrl}/api/logs`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -119,7 +121,7 @@ test('POST /api/logs rejects missing service', async function() {
         message: 'Missing service test'
     };
 
-    const response = await fetch('http://localhost:3002/api/logs', {
+    const response = await fetch(`${logsServiceUrl}/api/logs`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -140,7 +142,7 @@ test('POST /api/logs rejects missing message', async function() {
         level: 'info'
     };
 
-    const response = await fetch('http://localhost:3002/api/logs', {
+    const response = await fetch(`${logsServiceUrl}/api/logs`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -163,7 +165,7 @@ test('POST /api/logs rejects invalid optional method type', async function() {
         method: 123
     };
 
-    const response = await fetch('http://localhost:3002/api/logs', {
+    const response = await fetch(`${logsServiceUrl}/api/logs`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -186,7 +188,7 @@ test('POST /api/logs rejects invalid optional status type', async function() {
         status: '200'
     };
 
-    const response = await fetch('http://localhost:3002/api/logs', {
+    const response = await fetch(`${logsServiceUrl}/api/logs`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
