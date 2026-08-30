@@ -8,6 +8,7 @@ const sendLog = require('./logClient');
 
 const app = express(); // Creating the Express Application
 const port = process.env.PORT || 3001; // localhost:3001 → Costs Service
+const usersServiceUrl = process.env.USERS_SERVICE_URL || 'http://localhost:3000';
 
 app.use(express.json()); // Parses incoming JSON request bodies and makes the data available through req.body
 
@@ -106,7 +107,7 @@ app.post('/api/add', logEndpointAccess, function (req, res)  {
     }
 
     // Verifies that the referenced user exists before saving the cost. Sends a request to the Users Service
-    fetch(`http://localhost:3000/api/users/${costData.userid}/exists`)
+    fetch(`${usersServiceUrl}/api/users/${costData.userid}/exists`)
         .then(function(response) {
             // fetch does not reject automatically for HTTP error status codes
             if (!response.ok) {
