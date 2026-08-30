@@ -1,8 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert');
 
+const teamServiceUrl = process.env.TEAM_SERVICE_URL || 'http://localhost:3003';
+
 test('GET /api/about returns the development team', async function () {
-    const response = await fetch('http://localhost:3003/api/about');
+    const response = await fetch(`${teamServiceUrl}/api/about`);
     assert.strictEqual(response.status, 200);
 
     const contentType = response.headers.get('content-type');
@@ -26,7 +28,7 @@ test('GET /api/about returns the development team', async function () {
 });
 
 test('GET / returns Team Service health response', async function() {
-   const response = await fetch('http://localhost:3003/');
+   const response = await fetch(teamServiceUrl);
    assert.strictEqual(response.status, 200);
 
    const body = await response.text();
