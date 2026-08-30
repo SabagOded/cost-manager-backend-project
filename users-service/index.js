@@ -7,6 +7,7 @@ const sendLog = require('./logClient');
 
 const app = express(); // Creating the Express Application
 const port = process.env.PORT || 3000; // localhost:3000 → Users Service
+const costsServiceUrl = process.env.COSTS_SERVICE_URL || 'http://localhost:3001';
 
 app.use(express.json()); // Parses incoming JSON request bodies and makes the data available through req.body
 
@@ -83,7 +84,7 @@ app.get('/api/users/:id', logEndpointAccess, function (req, res) {
                     return res.status(404).json(errors.USER_NOT_FOUND);
                     //HTTP 404 The server returns an error when no user matches the requested ID
                 }
-                return fetch(`http://localhost:3001/api/total/${requestedUserId}`) // Sends an HTTP GET request from the Users Service to the Costs Service
+                return fetch(`${costsServiceUrl}/api/total/${requestedUserId}`) // Sends an HTTP GET request from the Users Service to the Costs Service
                     .then(function(response) {
                         // fetch does not reject automatically for HTTP error status codes
                         if (!response.ok) {
