@@ -1,8 +1,8 @@
-const express = require('express'); //Loads the express package and returns what it exports
-const sendLog = require('./logClient');
+const express = require('express'); // Loads the Express package
+const sendLog = require('./logClient'); // Imports the client used to send logs to the Logs Service
 
-const app = express(); //Creating the Express Application
-const port = process.env.PORT || 3003; //localhost:3003 → Team Service
+const app = express(); // Creates the Express application
+const port = process.env.PORT || 3003; // localhost:3003 → Team Service
 
 // Global logging middleware - runs for every HTTP request received by the Team Service.
 // sendLog() starts an HTTP request to the Logs Service, but we do not wait for it.
@@ -32,7 +32,7 @@ function logEndpointAccess(req, res, next) {
         method: req.method,
         path: req.originalUrl
     })
-        .catch(function(error) {
+        .catch(function (error) {
             console.error('Failed to send endpoint log: ', error.message);
         });
 
@@ -43,6 +43,10 @@ app.get('/', logEndpointAccess, function (req, res) {
     res.send('Team service is running');
 });
 
+/*
+ Returns static information about the development team.
+ The team members are not stored in MongoDB because they are not application users.
+ */
 app.get('/api/about', logEndpointAccess, function (req, res) { // Returns static information about the development team.
     return res.status(200).json([
         {
@@ -54,9 +58,8 @@ app.get('/api/about', logEndpointAccess, function (req, res) { // Returns static
             last_name: 'Naor',
         }
     ]);
-    // The team members are not stored in MongoDB because they are not application users.
 });
 
-app.listen(port, function(){
+app.listen(port, function() {
     console.log(`Team Service is running on port ${port}`);
 });

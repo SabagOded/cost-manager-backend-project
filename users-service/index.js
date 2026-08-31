@@ -11,10 +11,14 @@ const costsServiceUrl = process.env.COSTS_SERVICE_URL || 'http://localhost:3001'
 
 app.use(express.json()); // Parses incoming JSON request bodies and makes the data available through req.body
 
-// Global logging middleware - runs for every HTTP request received by the Costs Service.
-// sendLog() starts an HTTP request to the Logs Service, but we do not wait for it.
-// Logging should not delay or block the main business request.
+/*
+ Global logging middleware - runs for every HTTP request received by the Users Service.
+ sendLog() starts an HTTP request to the Logs Service, but we do not wait for it.
+ Logging should not delay or block the main business request.
+ */
 app.use(function (req, res, next) {
+// Logging is intentionally fire-and-forget.
+// We do not await sendLog() so logging failuers or delays will not block the main request.
    sendLog({
        service: 'users-service',
        level: 'info',
@@ -29,9 +33,12 @@ app.use(function (req, res, next) {
    next(); // Continue the Express request flow immediately
 });
 
-// Route-level logging middleware - records that a specific endpoint was matched.
-// It is passed to each route before the actual endpoint handler.
+/*
+ Route-level logging middleware - records that a specific endpoint was matched.
+ It is passed to each route before the actual endpoint handler.
+*/
 function logEndpointAccess(req, res, next) {
+// Endpoint logging is asynchronous and should not delay the actual route handler.
     sendLog({
         service: 'users-service',
         level: 'info',
@@ -45,6 +52,10 @@ function logEndpointAccess(req, res, next) {
     next(); // Continue to the actual endpoint handler
 }
 
+/*
+ Validates calendar dates and rejects impossible dates that JavaScript may normalize automatically.
+ For example, 2026-09-31 would otherwise be normalized to a date in October.
+*/
 function isValidCalendarDate(dateValue) {
     if (typeof dateValue !== 'string') {
         return false;
@@ -59,8 +70,7 @@ function isValidCalendarDate(dateValue) {
     const datePart = dateValue.split('T')[0]; // Takes the string from the start until the T: "2026-09-30T12:00:00.000Z" -> "2026-09-30"
     const [year, month, day] = datePart.split('-').map(Number);
 
-    //const normalizedDate = new Date(Date.UTC(year, month - 1, day)); // "month - 1" because JS counts the months from 0 to 11.
-
+    // Compares the parsed UTC date with the original values to detect date normalization.
     return (
         date.getUTCFullYear() === year &&
         date.getUTCMonth() + 1 === month &&
@@ -68,16 +78,15 @@ function isValidCalendarDate(dateValue) {
     );
 }
 
-
 connectToDatabase()
-    .then(function(){ // Connection successful
+    .then(function() { // Connection successful
         console.log('Connected to MongoDB Atlas');
 
-        app.listen(port, function(){ // Starting accepting HTTP requests only after we make sure that the infrastructure the service needs is available
+        app.listen(port, function() { // Starting accepting HTTP requests only after we make sure that the infrastructure the service needs is available
             console.log(`Users Service is running on port ${port}`);
         });
     })
-    .catch(function(error) { // Connection failed
+    .catch(function (error) { // Connection failed
         console.error('Failed to connect to MongoDB:', error.message);
     });
 
@@ -88,46 +97,45 @@ app.get('/', logEndpointAccess, function (req, res) {
 app.get('/api/users', logEndpointAccess, function (req, res) {
     // Returns all users stored in the database
     User.getAllUsers()
-        .then(function(users) {
+        .then(function (users) {
             return res.status(200).json(users);
         })
-        .catch(function(error){
+        .catch(function (error) {
             return res.status(500).json(errors.INTERNAL_SERVER_ERROR);
         });
 });
 
 app.get('/api/users/:id', logEndpointAccess, function (req, res) {
-    //Returns a specific user together with the total amount of their costs
+    // Returns a specific user together with the total amount of their costs
     const requestedUserId = Number(req.params.id);
     if (Number.isNaN(requestedUserId)) { // Validates that the user ID in the URL is a valid number
         return res.status(400).json(errors.INVALID_USER_INPUT);
     }
-       User.getUserById(requestedUserId) // Finds the user by the application-specific ID
-            .then(function(user) {
-                if (!user) {
-                    return res.status(404).json(errors.USER_NOT_FOUND);
-                    //HTTP 404 The server returns an error when no user matches the requested ID
-                }
-                return fetch(`${costsServiceUrl}/api/total/${requestedUserId}`) // Sends an HTTP GET request from the Users Service to the Costs Service
-                    .then(function(response) {
-                        // fetch does not reject automatically for HTTP error status codes
-                        if (!response.ok) {
-                            throw errors.INTERNAL_SERVER_ERROR;
-                        }
-                        return response.json(); // Parses the response body from JSON into a JavaScript object
-                    })
-                    .then(function (costData) {
-                        // CostData now contains the parsed data returned by the Costs Service
-                        return res.status(200).json({
-                            first_name: user.first_name,
-                            last_name: user.last_name,
-                            id: user.id,
-                            total: costData.total
-                        });
+    User.getUserById(requestedUserId) // Finds the user by the application-specific ID
+        .then(function(user) {
+            if (!user) {
+                return res.status(404).json(errors.USER_NOT_FOUND);
+            }
+            return fetch(`${costsServiceUrl}/api/total/${requestedUserId}`) // Sends an HTTP GET request from the Users Service to the Costs Service
+                .then(function (response) {
+                // fetch does not reject automatically for HTTP error status codes
+                    if (!response.ok) {
+                        throw errors.INTERNAL_SERVER_ERROR;
+                    }
+                    return response.json(); // Parses the response body from JSON into a JavaScript object
+                })
+                .then(function (costData) {
+                // CostData now contains the parsed data returned by the Costs Service
+                    return res.status(200).json({
+                        first_name: user.first_name,
+                        last_name: user.last_name,
+                        id: user.id,
+                        total: costData.total
                     });
-            }).catch(function(error){
-                return res.status(500).json(errors.INTERNAL_SERVER_ERROR);
-            });
+                });
+        }).catch(function (error) {
+            return res.status(500).json(errors.INTERNAL_SERVER_ERROR);
+        });
 });
 
 app.get('/api/users/:id/exists', logEndpointAccess, function (req, res) {
@@ -137,8 +145,8 @@ app.get('/api/users/:id/exists', logEndpointAccess, function (req, res) {
         return res.status(400).json(errors.INVALID_USER_INPUT);
     }
     User.getUserById(requestedUserId) // Finds the user by the application-specific ID
-        .then(function(user) { // Returns only the existence result needed by other services
-            if(!user){
+        .then(function (user) { // Returns only the existence result needed by other services
+            if(!user) {
                 return res.status(200).json({
                         exists: false
                 });
@@ -147,7 +155,7 @@ app.get('/api/users/:id/exists', logEndpointAccess, function (req, res) {
                 exists: true
             });
         })
-        .catch(function(error) {
+        .catch(function (error) {
             return res.status(500).json(errors.INTERNAL_SERVER_ERROR);
         });
 });
@@ -163,7 +171,6 @@ app.post('/api/add', logEndpointAccess, function (req, res) {
         userData.birthday === undefined
     ) {
         return res.status(400).json(errors.INVALID_USER_INPUT); // Stops the request early when required user data is missing
-        // HTTP 400 Bad Request (A client-side error indicating the server cannot process the request due to invalid syntax)
     }
     if ( // Validates the basic data types of the user fields
         typeof userData.id !== 'number' ||
@@ -180,21 +187,20 @@ app.post('/api/add', logEndpointAccess, function (req, res) {
     }
 
     User.getUserById(userData.id) // Checks whether a user with the same application ID already exists
-        .then(function(existingUser){
+        .then(function (existingUser) {
             if (existingUser) {
                 throw errors.USER_ALREADY_EXISTS;
             }
             return User.createUser(userData);
         })
-        .then(function(createdUser) {
+        .then(function (createdUser) {
             return res.status(201).json(createdUser);
         })
-        .catch(function(error) {
-            if (error.id === errors.USER_ALREADY_EXISTS.id){ // Handles the duplicate user error separately from unexpected server errors
+        .catch(function (error) {
+            if (error.id === errors.USER_ALREADY_EXISTS.id) {
+            // Handles the duplicate user error separately from unexpected server errors
                 return res.status(409).json(errors.USER_ALREADY_EXISTS);
-                //HTTP 409 Conflict (The request could not be processed because of a conflict with the current state)
             }
             return res.status(500).json(errors.INTERNAL_SERVER_ERROR);
-            //HTTP 500 Internal Server Error (The server encountered an unexpected condition that prevented it from fulfilling the request)
         });
 });

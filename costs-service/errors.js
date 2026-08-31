@@ -1,4 +1,4 @@
-// Defines the error responses used by the Costs Service | Costs Service Errors → 200–299
+// Defines the standardized error responses used by the Costs Service (IDs 200–299).
 const errors = {
     INVALID_USER_ID: {
         id: 201,

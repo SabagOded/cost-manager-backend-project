@@ -1,4 +1,4 @@
-// Defines the error response used by the Users Service | Users Service Errors → 100–199
+// Defines the standardized error responses used by the Users Service (IDs 100–199).
 const errors = {
     INVALID_USER_INPUT: {
         id: 101,

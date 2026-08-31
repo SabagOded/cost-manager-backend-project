@@ -1,10 +1,10 @@
 require('dotenv').config(); // Loads environment variables from .env into process.env before the rest of the application is initialized
 const express = require('express'); // Loads the express package and returns what it exports
 const connectToDatabase = require('./models/database'); // Imports the function responsible for connecting to MongoDB
-const Cost = require('./models/cost'); //Imports the Mongoose Cost model for working with cost documents
+const Cost = require('./models/cost'); // Imports the Mongoose Cost model for working with cost documents
 const errors = require('./errors'); // Imports the Costs Service errors definitions
-const MonthlyReport = require('./models/monthlyReport');
-const sendLog = require('./logClient');
+const MonthlyReport = require('./models/monthlyReport'); // Imports the Mongoose model used to store and reuse computed monthly reports
+const sendLog = require('./logClient'); // Imports the client responsible for sending log events to the Logs Service
 
 const app = express(); // Creating the Express Application
 const port = process.env.PORT || 3001; // localhost:3001 → Costs Service
@@ -12,10 +12,14 @@ const usersServiceUrl = process.env.USERS_SERVICE_URL || 'http://localhost:3000'
 
 app.use(express.json()); // Parses incoming JSON request bodies and makes the data available through req.body
 
-// Global logging middleware - runs for every HTTP request received by the Costs Service.
-// sendLog() starts an HTTP request to the Logs Service, but we do not wait for it.
-// Logging should not delay or block the main business request.
+/*
+ Global logging middleware - runs for every HTTP request received by the Costs Service.
+ sendLog() starts an HTTP request to the Logs Service, but we do not wait for it.
+ Logging should not delay or block the main business request.
+*/
 app.use(function (req, res, next) {
+// Logging is intentionally fire-and-forget.
+// We do not await sendLog() so logging failuers or delays will not block the main request.
     sendLog({
         service: 'costs-service',
         level: 'info',
@@ -30,9 +34,12 @@ app.use(function (req, res, next) {
     next(); // Continue the Express request flow immediately
 });
 
-// Route-level logging middleware - records that a specific endpoint was matched.
-// It is passed to each route before the actual endpoint handler.
+/*
+ Route-level logging middleware - records that a specific endpoint was matched.
+ It is passed to each route before the actual endpoint handler.
+*/
 function logEndpointAccess(req, res, next) {
+// Endpoint logging is asynchronous and should not delay the actual route handler.
     sendLog({
         service: 'costs-service',
         level: 'info',
@@ -40,14 +47,17 @@ function logEndpointAccess(req, res, next) {
         method: req.method,
         path: req.originalUrl
     })
-        .catch(function(error) {
+        .catch(function (error) {
             console.error('Failed to send endpoint log: ', error.message);
         });
 
     next(); // Continue to the actual endpoint handler
 }
 
-// Validation helper for calendar dates
+/*
+ Validates calendar dates and rejects impossible dates that JavaScript may normalize automatically.
+ For example, 2026-09-31 would otherwise be normalized to a date in October.
+*/
 function isValidCalendarDate(dateValue) {
     if (typeof dateValue !== 'string') {
         return false;
@@ -62,8 +72,7 @@ function isValidCalendarDate(dateValue) {
     const datePart = dateValue.split('T')[0]; // Takes the string from the start until the T: "2026-09-30T12:00:00.000Z" -> "2026-09-30"
     const [year, month, day] = datePart.split('-').map(Number);
 
-    //const normalizedDate = new Date(Date.UTC(year, month - 1, day)); // "month - 1" because JS counts the months from 0 to 11.
-
+    // Compares the parsed UTC date with the original values to detect date normalization.
     return (
         date.getUTCFullYear() === year &&
         date.getUTCMonth() + 1 === month &&
@@ -72,14 +81,14 @@ function isValidCalendarDate(dateValue) {
 }
 
 connectToDatabase()
-    .then(function(){ // Connection successful
+    .then(function () { // Connection successful
         console.log('Connected to MongoDB Atlas');
 
-        app.listen(port, function(){ // Starting accepting HTTP requests only after we make sure that the infrastructure the service needs is available
+        app.listen(port, function () { // Starting accepting HTTP requests only after we make sure that the infrastructure the service needs is available
             console.log(`Costs Service is running on port ${port}`);
         });
     })
-    .catch(function(error) { // Connection failed
+    .catch(function (error) { // Connection failed
         console.error('Failed to connect to MongoDB:', error.message);
     });
 
@@ -88,7 +97,7 @@ app.get('/', logEndpointAccess, function (req, res) {
 });
 
 app.get('/api/total/:userid', logEndpointAccess, function (req, res)  {
-    //Returns the total amount of costs for a specific user
+    // Returns the total amount of costs for a specific user
     const requestedUserid = Number(req.params.userid);
 
     if (Number.isNaN(requestedUserid)) {
@@ -96,7 +105,7 @@ app.get('/api/total/:userid', logEndpointAccess, function (req, res)  {
     }
 
     Cost.getCostsByUserId(requestedUserid)
-        .then(function(costs){
+        .then(function (costs) {
             const total = costs.reduce(function(sum, cost) {
                 return sum + cost.sum;
             }, 0);
@@ -106,16 +115,16 @@ app.get('/api/total/:userid', logEndpointAccess, function (req, res)  {
                 total: total
             });
         })
-        .catch(function(error) {
+        .catch(function (error) {
             return res.status(500).json(errors.INTERNAL_SERVER_ERROR);
         });
 });
 
-app.post('/api/add', logEndpointAccess, function (req, res)  {
-    //Handles HTTP POST requests for creating a new cost
+app.post('/api/add', logEndpointAccess, function (req, res) {
+    // Handles HTTP POST requests for creating a new cost
     const costData = req.body;
 
-    //Validates the basic structure and data types of the incoming cost
+    // Validates the basic structure and data types of the incoming cost
     // Each return stops the current route handler immediately if the input is invalid
     if (!costData.description || typeof costData.description !== 'string') {
         return res.status(400).json(errors.INVALID_COST_INPUT);
@@ -132,14 +141,14 @@ app.post('/api/add', logEndpointAccess, function (req, res)  {
 
     // Verifies that the referenced user exists before saving the cost. Sends a request to the Users Service
     fetch(`${usersServiceUrl}/api/users/${costData.userid}/exists`)
-        .then(function(response) {
+        .then(function (response) {
             // fetch does not reject automatically for HTTP error status codes
             if (!response.ok) {
                 throw errors.INTERNAL_SERVER_ERROR;
             }
             return response.json(); // response = { exists: true||false }
         })
-        .then(function(userExistsData) {
+        .then(function (userExistsData) {
             // Throwing here prevents the remaining success handlers from running
             if (!userExistsData.exists) {
                 throw errors.INVALID_USER_ID;
@@ -171,11 +180,11 @@ app.post('/api/add', logEndpointAccess, function (req, res)  {
             // createCost() validates the data through the Mongoose Schema, saves it to MongoDB and returns a Promise
             return Cost.createCost(newCostData);
         })
-        .then(function(createdCostData) {
+        .then(function (createdCostData) {
             // This handler runs only if Cost.create() was fulfilled successfully, and createdCostData is the Mongoose document that was created
             return res.status(201).json(createdCostData); // HTTP 201 - indicates that a new resource was successfully created
         })
-        .catch(function(error) {
+        .catch(function (error) {
             if (error.id === errors.INVALID_USER_ID.id) {
                 return res.status(400).json(errors.INVALID_USER_ID);
             }
@@ -187,11 +196,11 @@ app.post('/api/add', logEndpointAccess, function (req, res)  {
             ) {
                 return res.status(400).json(errors.INVALID_COST_INPUT);
             }
-            return res.status(500).json(errors.INTERNAL_SERVER_ERROR); // For any  unexpected database, network or application error
+            return res.status(500).json(errors.INTERNAL_SERVER_ERROR); // For any unexpected database, network or application error
         });
 });
 
-app.get('/api/report', logEndpointAccess, function (req, res)  { // Extracts and convert the user id from the query string
+app.get('/api/report', logEndpointAccess, function (req, res) { // Extracts and converts the user ID from the query string
     const requestedUserId = Number(req.query.id);
 
     if (Number.isNaN(requestedUserId)) {
@@ -204,7 +213,7 @@ app.get('/api/report', logEndpointAccess, function (req, res)  { // Extracts and
     if (Number.isNaN(requestedYear) ||
         requestedYear <= 0 ||
         (!Number.isInteger(requestedYear))) {
-            return res.status(400).json(errors.INVALID_REPORT_INPUT);
+        return res.status(400).json(errors.INVALID_REPORT_INPUT);
     }
 
     const requestedMonth = Number(req.query.month);
@@ -216,32 +225,33 @@ app.get('/api/report', logEndpointAccess, function (req, res)  { // Extracts and
         return res.status(400).json(errors.INVALID_REPORT_INPUT);
     }
 
-    //Create the exact UTC boundaries of the requested month.
+    // Create the exact UTC boundaries of the requested month.
     const startDate = new Date( // startDate is inclusive
         Date.UTC(requestedYear, requestedMonth - 1, 1, 0, 0, 0, 0));
 
     const endDate = new Date( // endDate represents the first day of the following month and is therefore exclusive.
         Date.UTC(requestedYear, requestedMonth, 1, 0, 0, 0));
 
+    // Formats the internal report structure into the array format required by the API response.
     function formatReportCosts(reportCosts) {
         return [
-            { food: reportCosts.food },
-            { education: reportCosts.education },
-            { health: reportCosts.health },
-            { housing: reportCosts.housing },
-            { sport: reportCosts.sport }
+            {food: reportCosts.food},
+            {education: reportCosts.education},
+            {health: reportCosts.health},
+            {housing: reportCosts.housing},
+            {sport: reportCosts.sport}
         ];
     }
 
     function calculateReport() {
-        // Calculate a monthly report directly from the costs collection
+        // Calculates a monthly report directly from the costs' collection.
         // The function returns a Promise that resolves to the report object and doesn't send an HTTP response by itself
 
-        const reportCosts = { food: [], education: [], health: [], housing: [], sport: [] }; // Initialize every required category so that empty
-                                                                                            // categories are still included in the final report
+        const reportCosts = {food: [], education: [], health: [], housing: [], sport: []}; // Initialize every required category so that empty
+        // categories are still included in the final report
         // Fetch only costs that belong to the requested user and month
         return Cost.getCostsByUserAndDateRange(requestedUserId, startDate, endDate)
-            .then(function(costs) {
+            .then(function (costs) {
                 for (const cost of costs) { // Group each cost under its category and keep only the fields required by the monthly report API
                     reportCosts[cost.category].push({
                         sum: cost.sum,
@@ -260,10 +270,10 @@ app.get('/api/report', logEndpointAccess, function (req, res)  { // Extracts and
 
     /*
     The Computed Pattern is used for historical monthly reports.
-    Once a month has ended, its costs cannot change because pasts costs cannot be added.
-    Therefore, the report is calculated once and stored.
-    Future requests for the same historical month return the saved report insted of quering and calculating the costs again.
-     */
+    Once a month has ended, its costs can no longer change because past costs cannot be added.
+    Therefore, the report is calculated once and stored in MongoDB.
+    Future requests for the same user/month/year reuse the stored report instead of querying and recalculating the costs.
+    */
 
     const isHistoricalMonth = endDate.getTime() <= Date.now();
 
@@ -281,10 +291,10 @@ app.get('/api/report', logEndpointAccess, function (req, res)  { // Extracts and
                     });
                 }
                 return calculateReport() // No stored report exists yet, so calculate it once and persist it
-                    .then(function(report) {
+                    .then(function (report) {
                         return MonthlyReport.createMonthlyReport(report);
                     })
-                    .then(function(savedReport) {
+                    .then(function (savedReport) {
                         return res.status(200).json({
                             userid: savedReport.userid,
                             month: savedReport.month,
@@ -293,14 +303,14 @@ app.get('/api/report', logEndpointAccess, function (req, res)  { // Extracts and
                         });
                     });
             })
-            .catch(function(error) {
+            .catch(function (error) {
                 console.error('Report error:', error);
                 return res.status(500).json(errors.INTERNAL_SERVER_ERROR);
             });
     }
 
     return calculateReport() // Current and future months are calculated dynamically and are not stored, because their data may still change
-        .then(function(report) {
+        .then(function (report) {
             return res.status(200).json({
                 userid: report.userid,
                 month: report.month,
@@ -308,7 +318,7 @@ app.get('/api/report', logEndpointAccess, function (req, res)  { // Extracts and
                 costs: formatReportCosts(report.costs)
             });
         })
-        .catch(function(error) {
+        .catch(function (error) {
             console.error('Report error:', error);
             return res.status(500).json(errors.INTERNAL_SERVER_ERROR);
         });

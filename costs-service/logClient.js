@@ -2,6 +2,7 @@
 // The services run as separate Node.js processes, so the logData object must be serialized to JSON before it can cross the process boundary.
 const logsServiceUrl = process.env.LOGS_SERVICE_URL || 'http://localhost:3002';
 
+// Sends the provided log data to the Logs Service and returns the fetch Promise.
 function sendLog(logData) {
     return fetch(`${logsServiceUrl}/api/logs`, {
         method: 'POST',

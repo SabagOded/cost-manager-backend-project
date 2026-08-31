@@ -1,5 +1,5 @@
-const pino = require('pino');
-const Log = require('./models/log'); // Mongoose model used to persist log documents in MongoDB
+const pino = require('pino'); // Imports Pino for structured logging
+const Log = require('./models/log'); // Imports the Mongoose model used to persist logs in MongoDB
 
 const logger = pino(); // Creates the Pino Logger used for structured terminal output. info/warn/error
 
@@ -13,7 +13,8 @@ The same event is sent through two logging paths:
                                                                         // ---> Pino -> Terminal
 function writeLog(logData) { // An event is occurring -> writeLog(logData) |
                                                                         // ---> Mongoose -> MongoDB -> cost_manager.logs
-    //Dynamically chooses the Pino method according to logData.level:
+
+    // Dynamically chooses the Pino method according to logData.level:
     logger[logData.level]( // "info" -> logger.info()   |    "warn" -> logger.warn()    |    "error" -> logger.error()
         {
             service: logData.service,
@@ -23,7 +24,7 @@ function writeLog(logData) { // An event is occurring -> writeLog(logData) |
         },
         logData.message
     );
-    // Saves the log to MongoDB through the model layer and returns a Promise
+    // Saves the log to MongoDB through the model layer and returns the save Promise.
     return Log.createLog(logData);
 }
 

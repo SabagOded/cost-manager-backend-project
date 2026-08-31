@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const errors = require("../errors");
 
 const userSchema = new mongoose.Schema({ // Creating a Schema object that describes User
     id: {type: Number, required: true, unique: true},
@@ -10,16 +9,19 @@ const userSchema = new mongoose.Schema({ // Creating a Schema object that descri
 
 const User = mongoose.model('User', userSchema); // Creating a model that connects the schema to work with documents in MongoDB
 
-function getAllUsers () {
+// Retrieves all users stored in the Users collection.
+function getAllUsers() {
     return User.find();
 }
 User.getAllUsers = getAllUsers;
 
-function getUserById (id) {
-    return User.findOne({id});
+// Retrieves a single user by the application-specific user ID.
+function getUserById(id) {
+    return User.findOne({ id });
 }
 User.getUserById = getUserById;
 
+// Creates and stores a new user document in MongoDB.
 function createUser(userData) {
     return User.create({
         id: userData.id,
