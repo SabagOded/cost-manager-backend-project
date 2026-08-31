@@ -23,8 +23,8 @@ function writeLog(logData) { // An event is occurring -> writeLog(logData) |
         },
         logData.message
     );
-    return Log.create(logData); // creates Mongoose document and saving it inside MongoDB
-    // Log.create() returns a Promise that resolves to the created Mongoose document
+    // Saves the log to MongoDB through the model layer and returns a Promise
+    return Log.createLog(logData);
 }
 
 module.exports = writeLog;

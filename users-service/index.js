@@ -45,6 +45,30 @@ function logEndpointAccess(req, res, next) {
     next(); // Continue to the actual endpoint handler
 }
 
+function isValidCalendarDate(dateValue) {
+    if (typeof dateValue !== 'string') {
+        return false;
+    }
+
+    const date = new Date(dateValue);
+
+    if (Number.isNaN(date.getTime())) { // IMPORTANT: Invalid Date produces NaN when getTime() is called!
+        return false;
+    }
+
+    const datePart = dateValue.split('T')[0]; // Takes the string from the start until the T: "2026-09-30T12:00:00.000Z" -> "2026-09-30"
+    const [year, month, day] = datePart.split('-').map(Number);
+
+    //const normalizedDate = new Date(Date.UTC(year, month - 1, day)); // "month - 1" because JS counts the months from 0 to 11.
+
+    return (
+        date.getUTCFullYear() === year &&
+        date.getUTCMonth() + 1 === month &&
+        date.getUTCDate() === day
+    );
+}
+
+
 connectToDatabase()
     .then(function(){ // Connection successful
         console.log('Connected to MongoDB Atlas');
@@ -63,7 +87,7 @@ app.get('/', logEndpointAccess, function (req, res) {
 
 app.get('/api/users', logEndpointAccess, function (req, res) {
     // Returns all users stored in the database
-    User.find() // Retrieves all user documents from the users collections
+    User.getAllUsers()
         .then(function(users) {
             return res.status(200).json(users);
         })
@@ -78,7 +102,7 @@ app.get('/api/users/:id', logEndpointAccess, function (req, res) {
     if (Number.isNaN(requestedUserId)) { // Validates that the user ID in the URL is a valid number
         return res.status(400).json(errors.INVALID_USER_INPUT);
     }
-        User.findOne({ id: requestedUserId }) // Finds the user by the application-specific ID
+       User.getUserById(requestedUserId) // Finds the user by the application-specific ID
             .then(function(user) {
                 if (!user) {
                     return res.status(404).json(errors.USER_NOT_FOUND);
@@ -112,7 +136,7 @@ app.get('/api/users/:id/exists', logEndpointAccess, function (req, res) {
     if (Number.isNaN(requestedUserId)) {
         return res.status(400).json(errors.INVALID_USER_INPUT);
     }
-    User.findOne( {id: requestedUserId} ) // Finds the user by the application-specific ID
+    User.getUserById(requestedUserId) // Finds the user by the application-specific ID
         .then(function(user) { // Returns only the existence result needed by other services
             if(!user){
                 return res.status(200).json({
@@ -144,27 +168,23 @@ app.post('/api/add', logEndpointAccess, function (req, res) {
     if ( // Validates the basic data types of the user fields
         typeof userData.id !== 'number' ||
         typeof userData.first_name !== 'string' ||
-        typeof userData.last_name !== 'string'
+        userData.first_name.length === 0 ||
+        typeof userData.last_name !== 'string' ||
+        userData.last_name.length === 0
     ) {
         return res.status(400).json(errors.INVALID_USER_INPUT);
     }
 
-    const birthday = new Date(userData.birthday);
-    if (Number.isNaN(birthday.getTime())) { // Validates that the birthday can be converted to a valid Date
+    if (!isValidCalendarDate(userData.birthday)) { // Validates that the birthday can be converted to a valid Date
         return res.status(400).json(errors.INVALID_USER_INPUT);
     }
 
-    User.findOne({ id: userData.id}) // Checks whether a user with the same application ID already exists
+    User.getUserById(userData.id) // Checks whether a user with the same application ID already exists
         .then(function(existingUser){
             if (existingUser) {
                 throw errors.USER_ALREADY_EXISTS;
             }
-            return User.create({
-                id: userData.id,
-                first_name: userData.first_name,
-                last_name: userData.last_name,
-                birthday: userData.birthday
-            });
+            return User.createUser(userData);
         })
         .then(function(createdUser) {
             return res.status(201).json(createdUser);

@@ -23,4 +23,14 @@ const logSchema = new mongoose.Schema({
 // Creates the Mongoose Model used to create, query and persist log documents
 const Log = mongoose.model('Log', logSchema);
 
+function getAllLogs() {
+    return Log.find();
+}
+Log.getAllLogs = getAllLogs;
+
+function createLog(logData) {
+    return Log.create(logData);
+}
+Log.createLog = createLog;
+
 module.exports = Log;

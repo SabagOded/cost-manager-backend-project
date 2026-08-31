@@ -156,6 +156,52 @@ test('POST /api/add rejects invalid cost sum input', async function() {
     assert.strictEqual(errorBody.message, 'Invalid cost input');
 });
 
+test('POST /api/add rejects sum = 0', async function() {
+    const invalidSum = {
+        description: 'Invalid sum = 0 test',
+        category: 'food',
+        userid: 123,
+        sum: 0
+    };
+
+    const response = await fetch(`${costsServiceUrl}/api/add`, {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json',
+        },
+        body: JSON.stringify(invalidSum)
+    });
+
+    assert.strictEqual(response.status, 400);
+
+    const errorBody = await response.json();
+    assert.strictEqual(errorBody.id, 203);
+    assert.strictEqual(errorBody.message, 'Invalid cost input');
+});
+
+test('POST /api/add rejects negative sum', async function() {
+    const invalidSum = {
+        description: 'Invalid negative sum test',
+        category: 'food',
+        userid: 123,
+        sum: -10
+    };
+
+    const response = await fetch(`${costsServiceUrl}/api/add`, {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json',
+        },
+        body: JSON.stringify(invalidSum)
+    });
+
+    assert.strictEqual(response.status, 400);
+
+    const errorBody = await response.json();
+    assert.strictEqual(errorBody.id, 203);
+    assert.strictEqual(errorBody.message, 'Invalid cost input');
+});
+
 test('POST /api/add rejects invalid cost category', async function() {
     const testUser = {
         id: Date.now(),
@@ -284,6 +330,47 @@ test('POST /api/add rejects missing cost description', async function() {
         userid: 123,
         sum: 10
     };
+
+    const response = await fetch(`${costsServiceUrl}/api/add`, {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json',
+        },
+        body: JSON.stringify(invalidCost)
+    });
+
+    assert.strictEqual(response.status, 400);
+
+    const errorBody = await response.json();
+    assert.strictEqual(errorBody.id, 203);
+    assert.strictEqual(errorBody.message, 'Invalid cost input');
+});
+
+test('POST /api/add rejects impossible cost date', async function() {
+    const testUser = {
+        id: Date.now(),
+        first_name: 'Invalid Date',
+        last_name: 'Test',
+        birthday: '2000-01-01'
+    }
+
+    const createUserResponse = await fetch(`${usersServiceUrl}/api/add`, {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json',
+        },
+        body: JSON.stringify(testUser)
+    });
+
+    assert.strictEqual(createUserResponse.status, 201);
+
+    const invalidCost = {
+        description: 'Invalid date test',
+        category: 'food',
+        userid: testUser.id,
+        sum: 10,
+        date: '2026-09-31'
+    }
 
     const response = await fetch(`${costsServiceUrl}/api/add`, {
         method: 'POST',

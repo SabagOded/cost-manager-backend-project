@@ -26,5 +26,19 @@ monthlyReportSchema.index(
 
 const MonthlyReport = mongoose.model('MonthlyReport', monthlyReportSchema);
 
+function getMonthlyReportById(requestedUserId, requestedMonth, requestedYear) {
+    return MonthlyReport.findOne({
+        userid: requestedUserId,
+        month: requestedMonth,
+        year: requestedYear
+    });
+}
+MonthlyReport.getMonthlyReportById = getMonthlyReportById;
+
+function createMonthlyReport(report) {
+    return MonthlyReport.create(report);
+}
+MonthlyReport.createMonthlyReport = createMonthlyReport;
+
 module.exports = MonthlyReport;
 

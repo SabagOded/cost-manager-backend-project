@@ -47,6 +47,30 @@ function logEndpointAccess(req, res, next) {
     next(); // Continue to the actual endpoint handler
 }
 
+// Validation helper for calendar dates
+function isValidCalendarDate(dateValue) {
+    if (typeof dateValue !== 'string') {
+        return false;
+    }
+
+    const date = new Date(dateValue);
+
+    if (Number.isNaN(date.getTime())) { // IMPORTANT: Invalid Date produces NaN when getTime() is called!
+        return false;
+    }
+
+    const datePart = dateValue.split('T')[0]; // Takes the string from the start until the T: "2026-09-30T12:00:00.000Z" -> "2026-09-30"
+    const [year, month, day] = datePart.split('-').map(Number);
+
+    //const normalizedDate = new Date(Date.UTC(year, month - 1, day)); // "month - 1" because JS counts the months from 0 to 11.
+
+    return (
+        date.getUTCFullYear() === year &&
+        date.getUTCMonth() + 1 === month &&
+        date.getUTCDate() === day
+    );
+}
+
 connectToDatabase()
     .then(function(){ // Connection successful
         console.log('Connected to MongoDB Atlas');
@@ -71,7 +95,7 @@ app.get('/api/total/:userid', logEndpointAccess, function (req, res)  {
         return res.status(404).json(errors.INVALID_USER_ID);
     }
 
-    Cost.find({ userid: requestedUserid })
+    Cost.getCostsByUserId(requestedUserid)
         .then(function(costs){
             const total = costs.reduce(function(sum, cost) {
                 return sum + cost.sum;
@@ -102,7 +126,7 @@ app.post('/api/add', logEndpointAccess, function (req, res)  {
     if (!Number.isFinite(costData.userid)) {
         return res.status(400).json(errors.INVALID_USER_ID);
     }
-    if (!Number.isFinite(costData.sum)) {
+    if (!Number.isFinite(costData.sum) || costData.sum <= 0) {
         return res.status(400).json(errors.INVALID_COST_INPUT);
     }
 
@@ -131,11 +155,12 @@ app.post('/api/add', logEndpointAccess, function (req, res)  {
 
             // If no date is provided, the Mongoose schema applies Date.now by default
             if (typeof costData.date !== 'undefined') {
-                const requestedDate = new Date(costData.date);
 
-                if (Number.isNaN(requestedDate.getTime())) { // IMPORTANT: Invalid Date produces NaN when getTime() is called!
+                if (!isValidCalendarDate(costData.date)) {
                     throw errors.INVALID_COST_INPUT;
                 }
+
+                const requestedDate = new Date(costData.date);
 
                 if (requestedDate.getTime() < Date.now()) { // Rejects cost dates that belong to the past, as required by the project rules
                     throw errors.INVALID_COST_INPUT;
@@ -143,8 +168,8 @@ app.post('/api/add', logEndpointAccess, function (req, res)  {
 
                 newCostData.date = requestedDate;
             }
-            // Cost.create() validates the object according to the Schema, saves it to MongoDB and returns a Promise
-            return Cost.create(newCostData);
+            // createCost() validates the data through the Mongoose Schema, saves it to MongoDB and returns a Promise
+            return Cost.createCost(newCostData);
         })
         .then(function(createdCostData) {
             // This handler runs only if Cost.create() was fulfilled successfully, and createdCostData is the Mongoose document that was created
@@ -214,14 +239,8 @@ app.get('/api/report', logEndpointAccess, function (req, res)  { // Extracts and
 
         const reportCosts = { food: [], education: [], health: [], housing: [], sport: [] }; // Initialize every required category so that empty
                                                                                             // categories are still included in the final report
-
-        return Cost.find( { // Fetch only costs that belong to the requested user and month
-            userid: requestedUserId,
-            date: {
-                "$gte": startDate,
-                "$lt": endDate
-            }
-        })
+        // Fetch only costs that belong to the requested user and month
+        return Cost.getCostsByUserAndDateRange(requestedUserId, startDate, endDate)
             .then(function(costs) {
                 for (const cost of costs) { // Group each cost under its category and keep only the fields required by the monthly report API
                     reportCosts[cost.category].push({
@@ -249,11 +268,9 @@ app.get('/api/report', logEndpointAccess, function (req, res)  { // Extracts and
     const isHistoricalMonth = endDate.getTime() <= Date.now();
 
     if (isHistoricalMonth) { // Historical reports may already have a previously computed result
-        return MonthlyReport.findOne({ // Check whether this exact user/month/year report was alreay computed
-            userid: requestedUserId,
-            month: requestedMonth,
-            year: requestedYear
-        })
+
+        // Check whether this exact user/month/year report was already computed
+        return MonthlyReport.getMonthlyReportById(requestedUserId, requestedMonth, requestedYear)
             .then(function (savedReport) {
                 if (savedReport) { // Reuse the stored report instead of calculating the month again
                     return res.status(200).json({
@@ -263,9 +280,9 @@ app.get('/api/report', logEndpointAccess, function (req, res)  { // Extracts and
                         costs: formatReportCosts(savedReport.costs)
                     });
                 }
-                return calculateReport() // No stored report exist yet, so calculate it once and persist it
+                return calculateReport() // No stored report exists yet, so calculate it once and persist it
                     .then(function(report) {
-                        return MonthlyReport.create(report);
+                        return MonthlyReport.createMonthlyReport(report);
                     })
                     .then(function(savedReport) {
                         return res.status(200).json({

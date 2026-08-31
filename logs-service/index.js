@@ -62,7 +62,7 @@ connectToDatabase()
     });
 
 app.get('/api/logs', logEndpointAccess, function (req, res) {
-    Log.find()
+    Log.getAllLogs()
         .then(function (logs) {
             return res.status(200).json(logs);
         })

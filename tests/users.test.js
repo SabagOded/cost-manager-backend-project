@@ -3,28 +3,6 @@ const assert = require('node:assert');
 
 const usersServiceUrl = process.env.USERS_SERVICE_URL || 'http://localhost:3000';
 
-test('GET /api/users returns all users', async function() {
-    const response = await fetch(`${usersServiceUrl}/api/users`);
-    assert.strictEqual(response.status, 200);
-
-    const contentType = response.headers.get('content-type');
-    assert.ok(contentType.includes('application/json'));
-
-    const body = await response.json();
-    assert.ok(Array.isArray(body));
-
-
-    for (const user of body) {
-        assert.strictEqual(typeof user, 'object');
-        assert.notStrictEqual(user, null);
-
-        assert.strictEqual(typeof user.id, 'number');
-        assert.strictEqual(typeof user.first_name, 'string');
-        assert.strictEqual(typeof user.last_name, 'string');
-        assert.strictEqual(typeof user.birthday, 'string');
-    }
-});
-
 test('POST /api/add creates a new user', async function () {
     const testUser = {
         id: Date.now(),
@@ -161,6 +139,95 @@ test('POST /api/add rejects missing user id input', async function() {
     const errorBody = await response.json();
     assert.strictEqual(errorBody.id, 101);
     assert.strictEqual(errorBody.message, 'Invalid user input');
+});
+
+test('POST /api/add rejects impossible user birthday', async function() {
+    const invalidUser = {
+        id: Date.now(),
+        first_name: 'Invalid',
+        last_name: 'Birthday',
+        birthday: '2000-02-30'
+    };
+
+    const response = await fetch(`${usersServiceUrl}/api/add`, {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json',
+        },
+        body: JSON.stringify(invalidUser)
+    });
+
+    assert.strictEqual(response.status, 400);
+
+    const errorBody = await response.json();
+    assert.strictEqual(errorBody.id, 101);
+    assert.strictEqual(errorBody.message, 'Invalid user input');
+});
+
+test('POST /api/add rejects empty first name', async function() {
+    const invalidUser = {
+        id: Date.now(),
+        first_name: '',
+        last_name: 'Missing First Name Test',
+        birthday: '2000-01-01'
+    }
+
+    const response = await fetch(`${usersServiceUrl}/api/add`, {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json',
+        },
+        body: JSON.stringify(invalidUser),
+    });
+
+    assert.strictEqual(response.status, 400);
+    const errorBody = await response.json();
+    assert.strictEqual(errorBody.id, 101);
+    assert.strictEqual(errorBody.message, 'Invalid user input');
+});
+
+test('POST /api/add rejects empty last name', async function() {
+    const invalidUser = {
+        id: Date.now(),
+        first_name: 'Missing First Name Test',
+        last_name: '',
+        birthday: '2000-01-01'
+    }
+
+    const response = await fetch(`${usersServiceUrl}/api/add`, {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json',
+        },
+        body: JSON.stringify(invalidUser),
+    });
+
+    assert.strictEqual(response.status, 400);
+    const errorBody = await response.json();
+    assert.strictEqual(errorBody.id, 101);
+    assert.strictEqual(errorBody.message, 'Invalid user input');
+});
+
+test('GET /api/users returns all users', async function() {
+    const response = await fetch(`${usersServiceUrl}/api/users`);
+    assert.strictEqual(response.status, 200);
+
+    const contentType = response.headers.get('content-type');
+    assert.ok(contentType.includes('application/json'));
+
+    const body = await response.json();
+    assert.ok(Array.isArray(body));
+
+
+    for (const user of body) {
+        assert.strictEqual(typeof user, 'object');
+        assert.notStrictEqual(user, null);
+
+        assert.strictEqual(typeof user.id, 'number');
+        assert.strictEqual(typeof user.first_name, 'string');
+        assert.strictEqual(typeof user.last_name, 'string');
+        assert.strictEqual(typeof user.birthday, 'string');
+    }
 });
 
 test('GET /api/users/:id returns an existing user with total costs', async function() {
