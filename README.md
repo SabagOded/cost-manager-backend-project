@@ -81,7 +81,9 @@ npm install
 ```
 
 3. Configure the required environment variables using the provided `.env.example` files.
-4. Start the four services in separate terminals:
+You must provide your own MongoDB connection string through the `MONGODB_URI` environment variable.
+   
+4. Open a separate terminal for each service, navigate to that service's directory, and start it with:
 
 ```bash
 node index.js
