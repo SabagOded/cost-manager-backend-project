@@ -425,7 +425,7 @@ test('GET /api/total/:userid returns the correct total for a user with costs', a
 
     const totalBody = await totalResponse.json();
     assert.strictEqual(totalBody.userid, testUser.id);
-    assert.notStrictEqual(totalBody.total, testCost.total);
+    assert.strictEqual(totalBody.total, testCost.sum);
 });
 
 test('GET /api/total/:userid rejects invalid user id', async function() {
